@@ -379,376 +379,778 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Create terrain with a ground plane
     function createTerrain() {
-      // Create a more realistic terrain with heightmap
-      const terrainSize = 10000;
-      const terrainSegments = 100;
-      const heightMultiplier = 300;
+      // Create scene fog for depth effect
+      scene.fog = new THREE.FogExp2(0xCFE2F3, 0.00025);
       
-      // Create ground geometry with more segments for better detail
-      const groundGeometry = new THREE.PlaneGeometry(terrainSize, terrainSize, terrainSegments, terrainSegments);
+      // Create a beautiful ground plane with advanced features
+      const terrainSize = 20000;
+      const terrainDetail = 250; // Higher detail for better looking terrain
       
-      // Apply heightmap to the terrain
-      const vertices = groundGeometry.attributes.position.array;
-      for (let i = 0; i < vertices.length; i += 3) {
-        // Skip the Y value (which is the height)
-        const x = vertices[i];
-        const z = vertices[i + 2];
-        
-        // Create realistic heightmap using Perlin-like noise simulation
-        // Combine multiple frequencies for more natural-looking terrain
-        const height = 
-          Math.sin(x * 0.01) * Math.cos(z * 0.01) * 20 +   // Large features
-          Math.sin(x * 0.05) * Math.cos(z * 0.05) * 10 +   // Medium features
-          Math.sin(x * 0.1) * Math.cos(z * 0.1) * 5;       // Small features
-          
-        vertices[i + 1] = height;
-      }
+      // Base ground with detailed texturing
+      const groundGeometry = new THREE.PlaneGeometry(terrainSize, terrainSize, terrainDetail, terrainDetail);
       
-      // Need to update normals after changing the vertices
-      groundGeometry.computeVertexNormals();
+      // Generate realistic heightmap
+      applyHeightmap(groundGeometry);
       
-      // Create gradient texture for the terrain
-      const terrainCanvas = document.createElement('canvas');
-      const terrainContext = terrainCanvas.getContext('2d');
-      terrainCanvas.width = 256;
-      terrainCanvas.height = 256;
-      
-      // Create a gradient for terrain coloring
-      const gradient = terrainContext.createLinearGradient(0, 0, 0, 256);
-      gradient.addColorStop(0, '#8B4513');   // Mountains (brown)
-      gradient.addColorStop(0.3, '#556B2F');  // Hills (dark green)
-      gradient.addColorStop(0.6, '#228B22');  // Grasslands (forest green)
-      gradient.addColorStop(0.8, '#D2B48C');  // Sandy areas
-      gradient.addColorStop(1, '#F5DEB3');    // Beaches
-      
-      terrainContext.fillStyle = gradient;
-      terrainContext.fillRect(0, 0, 256, 256);
-      
-      const terrainTexture = new THREE.CanvasTexture(terrainCanvas);
-      terrainTexture.wrapS = THREE.RepeatWrapping;
-      terrainTexture.wrapT = THREE.RepeatWrapping;
-      terrainTexture.repeat.set(10, 10);
-      
-      // Create material with the texture
-      const groundMaterial = new THREE.MeshPhongMaterial({ 
-        map: terrainTexture,
-        side: THREE.DoubleSide,
-        shininess: 0  // Matte finish for terrain
-      });
+      // Create beautiful ground texture with multi-layering
+      const groundMaterial = createTerrainMaterial();
       
       const ground = new THREE.Mesh(groundGeometry, groundMaterial);
       ground.rotation.x = -Math.PI / 2;
       ground.receiveShadow = true;
       scene.add(ground);
       
-      // Add mountains as separate meshes for better visuals
-      addMountains();
-      
-      // Add forests as clusters of trees
+      // Add environmental elements
+      addMountainRanges();
       addForests();
-      
-      // Add water bodies (lakes)
-      addWater();
-      
-      // Add some clouds
+      addLakes();
       addClouds();
     }
     
-    function addMountains() {
-      // Create more realistic mountains with varied shapes
-      for (let i = 0; i < 30; i++) {
-        // More varied sizes for natural look
-        const size = 50 + Math.random() * 150;
-        const height = 100 + Math.random() * 300;
+    function applyHeightmap(geometry) {
+      const vertices = geometry.attributes.position.array;
+      
+      // Use multiple noise frequencies for natural-looking terrain
+      for (let i = 0; i < vertices.length; i += 3) {
+        const x = vertices[i];
+        const z = vertices[i + 2];
         
-        // Use noise for more randomized mountain shapes
-        const jaggedness = 0.2 + Math.random() * 0.3;
-        const segments = 12 + Math.floor(Math.random() * 8);
+        // Use simplified Perlin-like noise algorithm for realistic terrain
+        let height = 0;
         
-        // Use custom geometry for more interesting mountain shapes
-        let mountainGeometry;
+        // Large-scale terrain features (mountains and valleys)
+        height += Math.sin(x * 0.002) * Math.cos(z * 0.002) * 120;
         
-        // Create different types of mountains
-        if (Math.random() > 0.5) {
-          // Cone-shaped mountains
-          mountainGeometry = new THREE.ConeGeometry(
-            size, 
-            height, 
-            segments, 
-            4 + Math.floor(Math.random() * 3),
-            false,
-            Math.random() * Math.PI * 2
-          );
-        } else {
-          // Pyramid-like mountains
-          mountainGeometry = new THREE.CylinderGeometry(
-            0, 
-            size, 
-            height, 
-            4 + Math.floor(Math.random() * 3),
-            5 + Math.floor(Math.random() * 3),
-            false
-          );
+        // Medium-scale features (hills)
+        height += Math.sin(x * 0.01) * Math.cos(z * 0.01) * 30;
+        
+        // Small-scale features (bumps and texture)
+        height += Math.sin(x * 0.05) * Math.cos(z * 0.05) * 5;
+        
+        // Add some randomness for natural variation
+        height += (Math.random() * 2 - 1) * 5;
+        
+        // Make the terrain more flat near the center (for runway/starting area)
+        const distanceFromCenter = Math.sqrt(x * x + z * z);
+        const centerFlatteningFactor = 1 - Math.max(0, 1 - distanceFromCenter / 500);
+        height *= centerFlatteningFactor;
+        
+        // Apply the height
+        vertices[i + 1] = height;
+      }
+      
+      // Update normals for proper lighting
+      geometry.computeVertexNormals();
+    }
+    
+    function createTerrainMaterial() {
+      // Create a canvas for ground texture
+      const canvas = document.createElement('canvas');
+      const context = canvas.getContext('2d');
+      canvas.width = 1024;
+      canvas.height = 1024;
+      
+      // Create a complex gradient for terrain coloring
+      const gradient = context.createLinearGradient(0, 0, 0, canvas.height);
+      
+      // Snow peaks
+      gradient.addColorStop(0, '#FFFFFF');
+      
+      // Rocky mountains
+      gradient.addColorStop(0.1, '#8D6E63');
+      gradient.addColorStop(0.25, '#6D4C41');
+      
+      // Forest green
+      gradient.addColorStop(0.4, '#2E7D32');
+      gradient.addColorStop(0.5, '#388E3C');
+      
+      // Grassy plains
+      gradient.addColorStop(0.7, '#7CB342');
+      
+      // Sandy shores
+      gradient.addColorStop(0.85, '#D7CCC8');
+      
+      // Beach
+      gradient.addColorStop(1, '#FAFAFA');
+      
+      context.fillStyle = gradient;
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      
+      // Add noise pattern for texture detail
+      addNoiseToCanvas(context, canvas.width, canvas.height);
+      
+      // Create the terrain material with texture
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.wrapS = THREE.RepeatWrapping;
+      texture.wrapT = THREE.RepeatWrapping;
+      texture.repeat.set(20, 20);
+      
+      // Create bump map for extra detail
+      const bumpCanvas = createBumpMap(canvas.width, canvas.height);
+      const bumpTexture = new THREE.CanvasTexture(bumpCanvas);
+      bumpTexture.wrapS = THREE.RepeatWrapping;
+      bumpTexture.wrapT = THREE.RepeatWrapping;
+      bumpTexture.repeat.set(20, 20);
+      
+      return new THREE.MeshPhongMaterial({
+        map: texture,
+        bumpMap: bumpTexture,
+        bumpScale: 20,
+        shininess: 0,
+        side: THREE.DoubleSide
+      });
+    }
+    
+    function addNoiseToCanvas(context, width, height) {
+      const imageData = context.getImageData(0, 0, width, height);
+      const data = imageData.data;
+      
+      for (let i = 0; i < data.length; i += 4) {
+        // Add subtle noise to each pixel
+        const noise = (Math.random() * 2 - 1) * 10;
+        data[i] = Math.max(0, Math.min(255, data[i] + noise));     // R
+        data[i + 1] = Math.max(0, Math.min(255, data[i + 1] + noise)); // G
+        data[i + 2] = Math.max(0, Math.min(255, data[i + 2] + noise)); // B
+      }
+      
+      context.putImageData(imageData, 0, 0);
+    }
+    
+    function createBumpMap(width, height) {
+      const canvas = document.createElement('canvas');
+      const context = canvas.getContext('2d');
+      canvas.width = width;
+      canvas.height = height;
+      
+      // Create noise-based bump map
+      const imageData = context.createImageData(width, height);
+      const data = imageData.data;
+      
+      for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+          const i = (y * width + x) * 4;
+          
+          // Generate Perlin-like noise
+          const value = (Math.sin(x * 0.1) * Math.cos(y * 0.1) * 0.5 + 0.5) * 255;
+          
+          // Add some random noise
+          const noise = Math.random() * 30;
+          data[i] = data[i + 1] = data[i + 2] = value + noise;
+          data[i + 3] = 255; // Alpha
         }
+      }
+      
+      context.putImageData(imageData, 0, 0);
+      return canvas;
+    }
+    
+    function addMountainRanges() {
+      // Add several mountain ranges for visual interest
+      const mountainRanges = 5;
+      
+      for (let r = 0; r < mountainRanges; r++) {
+        // Determine range properties
+        const rangeCenterAngle = r * (Math.PI * 2 / mountainRanges);
+        const rangeDistance = 3000 + Math.random() * 2000;
+        const rangeCenterX = Math.cos(rangeCenterAngle) * rangeDistance;
+        const rangeCenterZ = Math.sin(rangeCenterAngle) * rangeDistance;
+        const rangeLength = 2000 + Math.random() * 3000;
+        const rangeWidth = 800 + Math.random() * 1000;
+        const rangeDirection = Math.random() * Math.PI * 2;
         
-        // Distort vertices for more natural look
-        const vertices = mountainGeometry.attributes.position.array;
-        for (let j = 0; j < vertices.length; j += 3) {
-          if (vertices[j + 1] < height * 0.9) { // Don't affect the peak too much
-            vertices[j] += (Math.random() - 0.5) * size * jaggedness;
-            vertices[j + 2] += (Math.random() - 0.5) * size * jaggedness;
+        // Create mountains along the range
+        const mountainCount = 15 + Math.floor(Math.random() * 10);
+        
+        for (let i = 0; i < mountainCount; i++) {
+          // Position along the range
+          const positionAlongRange = (i / (mountainCount - 1) - 0.5) * rangeLength;
+          const offsetFromRange = (Math.random() - 0.5) * rangeWidth;
+          
+          // Calculate mountain position
+          const dirX = Math.cos(rangeDirection);
+          const dirZ = Math.sin(rangeDirection);
+          const perpX = -dirZ;
+          const perpZ = dirX;
+          
+          const mountainX = rangeCenterX + dirX * positionAlongRange + perpX * offsetFromRange;
+          const mountainZ = rangeCenterZ + dirZ * positionAlongRange + perpZ * offsetFromRange;
+          
+          // Mountain properties based on position in range
+          const centralPosition = 1 - Math.abs(positionAlongRange) / (rangeLength * 0.5);
+          const mountainSize = (100 + Math.random() * 150) * (0.7 + centralPosition * 0.5);
+          const mountainHeight = (200 + Math.random() * 500) * (0.7 + centralPosition * 0.5);
+          
+          // Create custom mountain geometry
+          let mountainGeometry;
+          
+          if (Math.random() > 0.3) {
+            // Cone mountains (more common)
+            mountainGeometry = new THREE.ConeGeometry(
+              mountainSize,
+              mountainHeight,
+              8 + Math.floor(Math.random() * 5)
+            );
+          } else {
+            // Pyramid mountains
+            mountainGeometry = new THREE.CylinderGeometry(
+              0,
+              mountainSize,
+              mountainHeight,
+              4 + Math.floor(Math.random() * 3)
+            );
           }
+          
+          // Distort vertices for more natural look
+          const vertices = mountainGeometry.attributes.position.array;
+          for (let j = 0; j < vertices.length; j += 3) {
+            if (vertices[j + 1] < mountainHeight * 0.8) {
+              vertices[j] += (Math.random() - 0.5) * mountainSize * 0.3;
+              vertices[j + 2] += (Math.random() - 0.5) * mountainSize * 0.3;
+            }
+          }
+          
+          mountainGeometry.computeVertexNormals();
+          
+          // Create mountain material with gradient texture
+          const material = createMountainMaterial(mountainHeight);
+          
+          const mountain = new THREE.Mesh(mountainGeometry, material);
+          
+          // Position and add to scene
+          mountain.position.set(
+            mountainX,
+            mountainHeight / 2 - 10, // Embed slightly in terrain
+            mountainZ
+          );
+          
+          mountain.castShadow = true;
+          mountain.receiveShadow = true;
+          scene.add(mountain);
         }
-        
-        mountainGeometry.computeVertexNormals();
-        
-        // Create gradient texture for mountains
-        const mountainCanvas = document.createElement('canvas');
-        const mountainContext = mountainCanvas.getContext('2d');
-        mountainCanvas.width = 512;
-        mountainCanvas.height = 512;
-        
-        // Create gradient based on height
-        const gradient = mountainContext.createLinearGradient(0, 0, 0, 512);
-        gradient.addColorStop(0, '#FFFFFF'); // Snow cap
-        gradient.addColorStop(0.3, '#A0A0A0'); // Rock
-        gradient.addColorStop(0.6, '#8B4513'); // Dirt/rock
-        gradient.addColorStop(1, '#556B2F'); // Base vegetation
-        
-        mountainContext.fillStyle = gradient;
-        mountainContext.fillRect(0, 0, 512, 512);
-        
-        const mountainTexture = new THREE.CanvasTexture(mountainCanvas);
-        
-        // Create material with the texture
-        const mountainMaterial = new THREE.MeshPhongMaterial({ 
-          map: mountainTexture,
-          shininess: 2,
-          bumpScale: 1
-        });
-        
-        const mountain = new THREE.Mesh(mountainGeometry, mountainMaterial);
-        
-        // Position mountains away from the center
-        const angle = Math.random() * Math.PI * 2;
-        const distance = 1000 + Math.random() * 4000;
-        mountain.position.set(
-          Math.cos(angle) * distance,
-          height / 2 - 20, // Slightly embed in terrain
-          Math.sin(angle) * distance
-        );
-        
-        // Random rotation for variety
-        mountain.rotation.y = Math.random() * Math.PI * 2;
-        
-        mountain.castShadow = true;
-        mountain.receiveShadow = true;
-        scene.add(mountain);
       }
     }
     
-    function addForests() {
-      // Add clusters of trees to create forest areas
-      const forestCount = 15;
-      const treesPerForest = 30;
+    function createMountainMaterial(height) {
+      // Create canvas for the gradient texture
+      const canvas = document.createElement('canvas');
+      const context = canvas.getContext('2d');
+      canvas.width = 512;
+      canvas.height = 512;
       
-      for (let i = 0; i < forestCount; i++) {
-        // Forest location
-        const forestAngle = Math.random() * Math.PI * 2;
-        const forestDistance = 1000 + Math.random() * 3500;
-        const forestX = Math.cos(forestAngle) * forestDistance;
-        const forestZ = Math.sin(forestAngle) * forestDistance;
+      // Create height-based gradient
+      const gradient = context.createLinearGradient(0, 0, 0, canvas.height);
+      
+      if (height > 400) {
+        // Tall mountains with snow caps
+        gradient.addColorStop(0, '#FFFFFF'); // Snow cap
+        gradient.addColorStop(0.3, '#E0E0E0'); // Snow with some rock showing
+        gradient.addColorStop(0.5, '#9E9E9E'); // Rocky area
+        gradient.addColorStop(0.7, '#6D4C41'); // Brown rock
+        gradient.addColorStop(1, '#5D4037'); // Dark brown base
+      } else {
+        // Smaller hills/mountains without snow
+        gradient.addColorStop(0, '#9E9E9E'); // Light rock
+        gradient.addColorStop(0.4, '#795548'); // Brown rock
+        gradient.addColorStop(0.8, '#5D4037'); // Darker brown
+        gradient.addColorStop(1, '#4E342E'); // Very dark brown base
+      }
+      
+      context.fillStyle = gradient;
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      
+      // Add some noise for texture
+      addNoiseToCanvas(context, canvas.width, canvas.height);
+      
+      const texture = new THREE.CanvasTexture(canvas);
+      
+      return new THREE.MeshPhongMaterial({
+        map: texture,
+        shininess: 0,
+        flatShading: true
+      });
+    }
+    
+    function addForests() {
+      // Create multiple forest clusters
+      const forestClusters = 15;
+      
+      for (let i = 0; i < forestClusters; i++) {
+        // Forest cluster properties
+        const clusterAngle = Math.random() * Math.PI * 2;
+        const clusterDistance = 1000 + Math.random() * 3000;
+        const clusterX = Math.cos(clusterAngle) * clusterDistance;
+        const clusterZ = Math.sin(clusterAngle) * clusterDistance;
+        const clusterRadius = 400 + Math.random() * 600;
         
-        for (let j = 0; j < treesPerForest; j++) {
-          // Tree properties
-          const treeHeight = 30 + Math.random() * 50;
-          const trunkRadius = 2 + Math.random() * 3;
-          
-          // Position trees in a cluster
+        // Determine tree density based on distance (sparser forests further away)
+        const treeDensity = Math.max(0.3, 1 - clusterDistance / 6000);
+        const treeCount = Math.floor(treeDensity * (100 + Math.random() * 100));
+        
+        // Create trees in cluster
+        for (let j = 0; j < treeCount; j++) {
+          // Tree position within cluster (more dense in center)
           const treeAngle = Math.random() * Math.PI * 2;
-          const treeDistance = Math.random() * 200;
-          const treeX = forestX + Math.cos(treeAngle) * treeDistance;
-          const treeZ = forestZ + Math.sin(treeAngle) * treeDistance;
+          const treeDistanceFromCenter = Math.pow(Math.random(), 0.8) * clusterRadius; // Concentrate trees toward center
+          const treeX = clusterX + Math.cos(treeAngle) * treeDistanceFromCenter;
+          const treeZ = clusterZ + Math.sin(treeAngle) * treeDistanceFromCenter;
           
-          // Create trunk
-          const trunkGeometry = new THREE.CylinderGeometry(
-            trunkRadius * 0.7, // Top radius slightly smaller
-            trunkRadius,       // Bottom radius
-            treeHeight * 0.4,  // Trunk height
-            8,                 // Segments
-            1
-          );
+          // Tree properties
+          const treeType = Math.random();
+          let tree;
           
-          const trunkMaterial = new THREE.MeshPhongMaterial({ 
-            color: 0x8B4513, // Brown
-            shininess: 3
-          });
-          
-          const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
-          
-          // Create foliage (tree top)
-          let foliageGeometry;
-          const foliageSize = trunkRadius * 5;
-          
-          if (Math.random() > 0.5) {
-            // Conical trees (like pine)
-            foliageGeometry = new THREE.ConeGeometry(
-              foliageSize,
-              treeHeight * 0.8,
-              8
-            );
+          if (treeType < 0.6) {
+            // Pine tree (more common)
+            tree = createPineTree();
+          } else if (treeType < 0.9) {
+            // Oak tree
+            tree = createOakTree();
           } else {
-            // Round top trees (like oak)
-            foliageGeometry = new THREE.SphereGeometry(
-              foliageSize,
-              8,
-              6
-            );
+            // Dead tree (rare)
+            tree = createDeadTree();
           }
-          
-          // Green with slight variations
-          const greenShade = 0.2 + Math.random() * 0.2;
-          const foliageMaterial = new THREE.MeshPhongMaterial({ 
-            color: new THREE.Color(0, greenShade, 0),
-            shininess: 1
-          });
-          
-          const foliage = new THREE.Mesh(foliageGeometry, foliageMaterial);
-          
-          // Position foliage on top of trunk
-          foliage.position.y = treeHeight * 0.2; // Half of trunk height + half of foliage height
-          
-          // Create tree group
-          const tree = new THREE.Group();
-          tree.add(trunk);
-          tree.add(foliage);
           
           // Position tree
           tree.position.set(treeX, 0, treeZ);
           
-          tree.castShadow = true;
-          tree.receiveShadow = true;
+          // Random rotation
+          tree.rotation.y = Math.random() * Math.PI * 2;
+          
+          // Random scale variation
+          const scale = 0.8 + Math.random() * 0.4;
+          tree.scale.set(scale, scale, scale);
+          
           scene.add(tree);
         }
       }
     }
     
-    function addWater() {
-      // Add lakes and rivers
-      const waterCount = 10;
+    function createPineTree() {
+      const tree = new THREE.Group();
       
-      for (let i = 0; i < waterCount; i++) {
-        // Lake properties
-        const lakeRadius = 100 + Math.random() * 300;
+      // Tree height
+      const height = 30 + Math.random() * 40;
+      const trunkHeight = height * 0.5;
+      const trunkRadius = height * 0.03;
+      
+      // Create trunk
+      const trunkGeometry = new THREE.CylinderGeometry(
+        trunkRadius * 0.7, // Top slightly narrower
+        trunkRadius,
+        trunkHeight,
+        8
+      );
+      
+      const trunkMaterial = new THREE.MeshPhongMaterial({
+        color: 0x8B4513,
+        shininess: 3
+      });
+      
+      const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
+      trunk.position.y = trunkHeight / 2;
+      trunk.castShadow = true;
+      
+      tree.add(trunk);
+      
+      // Create multiple layers of foliage
+      const foliageLayers = 3 + Math.floor(Math.random() * 3);
+      const foliageHeight = height * 0.5;
+      const layerHeight = foliageHeight / foliageLayers;
+      
+      for (let i = 0; i < foliageLayers; i++) {
+        const ratio = 1 - i / foliageLayers;
+        const layerRadius = height * 0.15 * (0.6 + ratio * 0.4);
         
-        // Water geometry (slightly below ground level)
-        const waterGeometry = new THREE.CircleGeometry(lakeRadius, 32);
-        
-        // Water material with slight transparency and blue color
-        const waterMaterial = new THREE.MeshPhongMaterial({ 
-          color: 0x3399ff,
-          transparent: true,
-          opacity: 0.8,
-          shininess: 100,
-          specular: 0xffffff
-        });
-        
-        const water = new THREE.Mesh(waterGeometry, waterMaterial);
-        
-        // Position lakes away from center
-        const lakeAngle = Math.random() * Math.PI * 2;
-        const lakeDistance = 1000 + Math.random() * 3000;
-        
-        water.position.set(
-          Math.cos(lakeAngle) * lakeDistance,
-          1, // Slightly above ground to avoid z-fighting
-          Math.sin(lakeAngle) * lakeDistance
+        const foliageGeometry = new THREE.ConeGeometry(
+          layerRadius,
+          layerHeight * 1.2, // Overlap layers slightly
+          8
         );
         
-        // Rotate to be flat on the ground
-        water.rotation.x = -Math.PI / 2;
+        // Vary the green shade
+        const greenHue = 0.25 + Math.random() * 0.1;
+        const greenSaturation = 0.5 + Math.random() * 0.3;
+        const greenLightness = 0.25 + Math.random() * 0.1;
         
-        scene.add(water);
+        const foliageMaterial = new THREE.MeshPhongMaterial({
+          color: new THREE.Color().setHSL(greenHue, greenSaturation, greenLightness),
+          shininess: 5
+        });
+        
+        const foliage = new THREE.Mesh(foliageGeometry, foliageMaterial);
+        foliage.position.y = trunkHeight + i * layerHeight * 0.8;
+        foliage.castShadow = true;
+        
+        tree.add(foliage);
+      }
+      
+      return tree;
+    }
+    
+    function createOakTree() {
+      const tree = new THREE.Group();
+      
+      // Tree dimensions
+      const height = 25 + Math.random() * 30;
+      const trunkHeight = height * 0.6;
+      const trunkRadius = height * 0.04;
+      
+      // Create trunk
+      const trunkGeometry = new THREE.CylinderGeometry(
+        trunkRadius * 0.8,
+        trunkRadius,
+        trunkHeight,
+        10
+      );
+      
+      const trunkMaterial = new THREE.MeshPhongMaterial({
+        color: 0x8B4513,
+        shininess: 3
+      });
+      
+      const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
+      trunk.position.y = trunkHeight / 2;
+      trunk.castShadow = true;
+      
+      tree.add(trunk);
+      
+      // Create foliage (round shape)
+      const foliageGeometry = new THREE.SphereGeometry(
+        height * 0.25,
+        10,
+        10
+      );
+      
+      const foliageMaterial = new THREE.MeshPhongMaterial({
+        color: new THREE.Color(0.2 + Math.random() * 0.1, 0.5 + Math.random() * 0.2, 0.1),
+        shininess: 5
+      });
+      
+      const foliage = new THREE.Mesh(foliageGeometry, foliageMaterial);
+      foliage.position.y = trunkHeight + height * 0.15;
+      foliage.scale.y = 1.2; // Slightly elongated vertically
+      foliage.castShadow = true;
+      
+      tree.add(foliage);
+      
+      return tree;
+    }
+    
+    function createDeadTree() {
+      const tree = new THREE.Group();
+      
+      // Tree dimensions
+      const height = 20 + Math.random() * 25;
+      const trunkRadius = height * 0.03;
+      
+      // Create twisted trunk
+      const trunkGeometry = new THREE.CylinderGeometry(
+        trunkRadius * 0.5,
+        trunkRadius,
+        height,
+        8
+      );
+      
+      // Add twist and bend to vertices
+      const vertices = trunkGeometry.attributes.position.array;
+      for (let i = 0; i < vertices.length; i += 3) {
+        const y = vertices[i + 1];
+        const normalizedHeight = y / height;
+        
+        // Add progressive twist and bend
+        const twistAmount = normalizedHeight * Math.PI * 0.2;
+        const bendAmount = Math.pow(normalizedHeight, 2) * 5;
+        
+        // Apply twist (rotate around Y axis)
+        const x = vertices[i];
+        const z = vertices[i + 2];
+        const distance = Math.sqrt(x*x + z*z);
+        if (distance > 0) {
+          const angle = Math.atan2(z, x) + twistAmount;
+          vertices[i] = Math.cos(angle) * distance;
+          vertices[i + 2] = Math.sin(angle) * distance;
+        }
+        
+        // Apply bend (in random direction)
+        const bendDirection = Math.PI * 1.5; // Bend direction
+        vertices[i] += Math.cos(bendDirection) * bendAmount;
+        vertices[i + 2] += Math.sin(bendDirection) * bendAmount;
+      }
+      
+      trunkGeometry.computeVertexNormals();
+      
+      const trunkMaterial = new THREE.MeshPhongMaterial({
+        color: 0x5D4037, // Dark brown
+        shininess: 0
+      });
+      
+      const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
+      trunk.position.y = height / 2;
+      trunk.castShadow = true;
+      
+      tree.add(trunk);
+      
+      // Add a few branches
+      const branchCount = 3 + Math.floor(Math.random() * 3);
+      
+      for (let i = 0; i < branchCount; i++) {
+        const branchHeight = height * (0.5 + Math.random() * 0.4);
+        const branchAngle = Math.random() * Math.PI * 2;
+        const branchTilt = Math.PI / 4 + Math.random() * Math.PI / 4;
+        
+        const branchLength = height * (0.2 + Math.random() * 0.3);
+        const branchRadius = trunkRadius * (0.3 + Math.random() * 0.3);
+        
+        const branchGeometry = new THREE.CylinderGeometry(
+          branchRadius * 0.5,
+          branchRadius,
+          branchLength,
+          6
+        );
+        
+        const branch = new THREE.Mesh(branchGeometry, trunkMaterial);
+        
+        // Position at side of trunk
+        branch.position.y = branchHeight;
+        
+        // Rotate to point outward
+        branch.rotation.z = branchTilt;
+        branch.rotation.y = branchAngle;
+        
+        // Move to be connected to trunk
+        branch.position.x = Math.cos(branchAngle) * trunkRadius;
+        branch.position.z = Math.sin(branchAngle) * trunkRadius;
+        
+        // Move pivot to base of branch
+        branch.geometry.translate(0, branchLength/2, 0);
+        
+        branch.castShadow = true;
+        tree.add(branch);
+      }
+      
+      return tree;
+    }
+    
+    function addLakes() {
+      // Add several lakes of different sizes
+      const lakeCount = 10;
+      
+      for (let i = 0; i < lakeCount; i++) {
+        // Lake position
+        const angle = Math.random() * Math.PI * 2;
+        const distance = 1000 + Math.random() * 4000;
+        const lakeX = Math.cos(angle) * distance;
+        const lakeZ = Math.sin(angle) * distance;
+        
+        // Lake dimensions
+        const lakeSize = 200 + Math.random() * 500;
+        
+        // Create lake with irregular shape
+        const lakeShape = new THREE.Shape();
+        
+        // Create irregular polygon
+        const segments = 12 + Math.floor(Math.random() * 8);
+        for (let j = 0; j < segments; j++) {
+          const segmentAngle = j * Math.PI * 2 / segments;
+          const segmentRadius = lakeSize * (0.8 + Math.random() * 0.4);
+          const x = Math.cos(segmentAngle) * segmentRadius;
+          const y = Math.sin(segmentAngle) * segmentRadius;
+          
+          if (j === 0) {
+            lakeShape.moveTo(x, y);
+          } else {
+            lakeShape.lineTo(x, y);
+          }
+        }
+        
+        lakeShape.closePath();
+        
+        const lakeGeometry = new THREE.ShapeGeometry(lakeShape);
+        
+        // Create water material with nice blue color and high specular
+        const lakeMaterial = new THREE.MeshPhongMaterial({
+          color: 0x0288D1, // Nice blue
+          specular: 0xFFFFFF,
+          shininess: 100,
+          transparent: true,
+          opacity: 0.8
+        });
+        
+        const lake = new THREE.Mesh(lakeGeometry, lakeMaterial);
+        
+        // Rotate to be flat on ground and position
+        lake.rotation.x = -Math.PI / 2;
+        lake.position.set(lakeX, 2, lakeZ); // Slightly above ground to avoid z-fighting
+        
+        scene.add(lake);
+        
+        // Add beach/shore around lake
+        addLakeShore(lakeX, lakeZ, lakeShape, lakeSize);
       }
     }
     
-    function addClouds() {
-      // Create more realistic cloud formations
-      const cloudGroupCount = 30;
+    function addLakeShore(lakeX, lakeZ, lakeShape, lakeSize) {
+      // Create a slightly larger shape for the shore
+      const shoreShape = new THREE.Shape();
+      const lakePoints = lakeShape.getPoints();
       
-      for (let i = 0; i < cloudGroupCount; i++) {
-        // Create a cloud group (multiple cloud puffs together)
+      // Create a shore that's slightly larger than the lake
+      for (let i = 0; i < lakePoints.length; i++) {
+        const point = lakePoints[i];
+        const angle = Math.atan2(point.y, point.x);
+        const distance = Math.sqrt(point.x * point.x + point.y * point.y);
+        
+        // Make shore 10-20% larger than lake
+        const shoreDistance = distance * (1.1 + Math.random() * 0.1);
+        const x = Math.cos(angle) * shoreDistance;
+        const y = Math.sin(angle) * shoreDistance;
+        
+        if (i === 0) {
+          shoreShape.moveTo(x, y);
+        } else {
+          shoreShape.lineTo(x, y);
+        }
+      }
+      
+      shoreShape.closePath();
+      
+      // Create a donut-like shape (shore minus lake)
+      const holeShape = new THREE.Path();
+      for (let i = 0; i < lakePoints.length; i++) {
+        if (i === 0) {
+          holeShape.moveTo(lakePoints[i].x, lakePoints[i].y);
+        } else {
+          holeShape.lineTo(lakePoints[i].x, lakePoints[i].y);
+        }
+      }
+      
+      shoreShape.holes.push(holeShape);
+      
+      const shoreGeometry = new THREE.ShapeGeometry(shoreShape);
+      
+      // Create sandy material for shore
+      const shoreMaterial = new THREE.MeshPhongMaterial({
+        color: 0xF5DEB3, // Sandy color
+        shininess: 0
+      });
+      
+      const shore = new THREE.Mesh(shoreGeometry, shoreMaterial);
+      
+      // Position shore
+      shore.rotation.x = -Math.PI / 2;
+      shore.position.set(lakeX, 1, lakeZ); // Slightly above ground but below water
+      
+      scene.add(shore);
+    }
+    
+    function addClouds() {
+      // Create multiple cloud layers and types
+      
+      // High fluffy clouds
+      createCloudLayer(50, 2000, 800, 0.5, 0.7);
+      
+      // Mid-level clouds
+      createCloudLayer(30, 1200, 500, 0.6, 0.8);
+      
+      // Low scattered clouds
+      createCloudLayer(20, 800, 400, 0.7, 0.9);
+    }
+    
+    function createCloudLayer(count, baseHeight, heightVariation, minOpacity, maxOpacity) {
+      for (let i = 0; i < count; i++) {
+        // Cloud position covering the whole sky
+        const angle = Math.random() * Math.PI * 2;
+        const distance = Math.random() * 8000;
+        const cloudX = Math.cos(angle) * distance;
+        const cloudZ = Math.sin(angle) * distance;
+        const cloudY = baseHeight + Math.random() * heightVariation;
+        
+        // Create cloud formation
         const cloudGroup = new THREE.Group();
         
-        // Number of cloud puffs in this formation
-        const puffCount = 3 + Math.floor(Math.random() * 8);
+        // Number of puffs in this cloud
+        const puffCount = 5 + Math.floor(Math.random() * 15);
         
-        // Base size for this cloud formation
-        const baseSize = 30 + Math.random() * 60;
+        // Overall cloud size
+        const cloudSize = 200 + Math.random() * 300;
+        
+        // Cloud shape (elongation factor)
+        const elongation = 1 + Math.random() * 2;
         
         for (let j = 0; j < puffCount; j++) {
-          // Vary the size of each puff
-          const puffSize = baseSize * (0.6 + Math.random() * 0.8);
+          // Position within cloud
+          const puffAngle = Math.random() * Math.PI * 2;
+          const puffDistanceFromCenter = Math.random() * cloudSize/2 * 
+                                        (1 - 0.5 * Math.pow(Math.random(), 2)); // More dense in center
           
-          // Create a cloud puff
-          const cloudGeometry = new THREE.SphereGeometry(puffSize, 7, 7);
-          const cloudMaterial = new THREE.MeshPhongMaterial({ 
-            color: 0xffffff,
+          const puffX = Math.cos(puffAngle) * puffDistanceFromCenter * elongation;
+          const puffZ = Math.sin(puffAngle) * puffDistanceFromCenter;
+          const puffY = (Math.random() - 0.5) * cloudSize * 0.2;
+          
+          // Puff size based on distance from center
+          const distanceRatio = puffDistanceFromCenter / (cloudSize/2);
+          const puffSize = (cloudSize * 0.2) * (1 - 0.5 * distanceRatio);
+          
+          // Create cloud puff
+          const puffGeometry = new THREE.SphereGeometry(puffSize, 7, 7);
+          
+          // Cloud opacity decreases toward edges
+          const opacity = minOpacity + (maxOpacity - minOpacity) * (1 - distanceRatio);
+          
+          const puffMaterial = new THREE.MeshPhongMaterial({
+            color: 0xFFFFFF,
             transparent: true,
-            opacity: 0.8 + Math.random() * 0.2
+            opacity: opacity,
+            specular: 0xFFFFFF,
+            shininess: 100
           });
           
-          const cloudPuff = new THREE.Mesh(cloudGeometry, cloudMaterial);
+          const puff = new THREE.Mesh(puffGeometry, puffMaterial);
+          puff.position.set(puffX, puffY, puffZ);
           
-          // Position this puff relative to the cloud group
-          const puffOffset = baseSize * 0.8;
-          cloudPuff.position.set(
-            (Math.random() - 0.5) * puffOffset,
-            (Math.random() - 0.5) * puffOffset * 0.5,
-            (Math.random() - 0.5) * puffOffset
-          );
+          // Slightly squish the puff vertically
+          puff.scale.y = 0.7;
           
-          // Squish the clouds a bit to make them more cloud-like
-          cloudPuff.scale.y = 0.5 + Math.random() * 0.3;
-          
-          cloudGroup.add(cloudPuff);
+          cloudGroup.add(puff);
         }
         
-        // Position the entire cloud formation
-        const cloudHeight = 300 + Math.random() * 700;
-        const angle = Math.random() * Math.PI * 2;
-        const distance = Math.random() * 5000;
+        // Position the entire cloud
+        cloudGroup.position.set(cloudX, cloudY, cloudZ);
         
-        cloudGroup.position.set(
-          Math.cos(angle) * distance,
-          cloudHeight,
-          Math.sin(angle) * distance
-        );
+        // Random cloud rotation
+        cloudGroup.rotation.y = Math.random() * Math.PI * 2;
         
         scene.add(cloudGroup);
       }
     }
     
-    // Create a sky dome with gradient for better visual effect
+    // Create a beautiful sky with gradient and sun
     function createSky() {
-      // Create a larger sky dome
-      const skyGeometry = new THREE.SphereGeometry(8000, 32, 32);
+      // Create a larger sky dome for better visuals
+      const skyGeometry = new THREE.SphereGeometry(9000, 32, 32);
       
-      // Create a sky gradient texture
+      // Create a richer sky texture with more detailed gradient
       const skyCanvas = document.createElement('canvas');
       const skyContext = skyCanvas.getContext('2d');
-      skyCanvas.width = 512;
-      skyCanvas.height = 512;
+      skyCanvas.width = 1024;
+      skyCanvas.height = 1024;
       
-      // Create a vertical gradient
-      const gradient = skyContext.createLinearGradient(0, 0, 0, 512);
-      gradient.addColorStop(0, '#0077FF'); // Deep blue at the top
-      gradient.addColorStop(0.4, '#87CEEB'); // Sky blue
-      gradient.addColorStop(0.8, '#E0F6FF'); // Light blue/white at the horizon
-      gradient.addColorStop(1, '#FFF8E0'); // Subtle yellow/white at the bottom for sunset effect
+      // Create a more detailed vertical gradient
+      const gradient = skyContext.createLinearGradient(0, 0, 0, skyCanvas.height);
+      
+      // More detailed sky colors
+      gradient.addColorStop(0, '#0A2463'); // Deep blue at the top
+      gradient.addColorStop(0.2, '#1E5AC8'); // Rich blue
+      gradient.addColorStop(0.4, '#4A99E9'); // Medium blue
+      gradient.addColorStop(0.6, '#7EC8F2'); // Light blue
+      gradient.addColorStop(0.8, '#C4E4F2'); // Very light blue
+      gradient.addColorStop(0.95, '#FFE3D0'); // Subtle orange/pink at horizon
+      gradient.addColorStop(1, '#FFFFFF'); // White at bottom
       
       skyContext.fillStyle = gradient;
-      skyContext.fillRect(0, 0, 512, 512);
+      skyContext.fillRect(0, 0, skyCanvas.width, skyCanvas.height);
+      
+      // Add some subtle noise for a more natural look
+      addNoiseToCanvas(skyContext, skyCanvas.width, skyCanvas.height);
       
       const skyTexture = new THREE.CanvasTexture(skyCanvas);
       
@@ -761,28 +1163,104 @@ document.addEventListener('DOMContentLoaded', () => {
       const sky = new THREE.Mesh(skyGeometry, skyMaterial);
       scene.add(sky);
       
-      // Add a sun
-      addSun();
+      // Add a beautiful sun with glow effect
+      addImpressiveSun();
     }
     
-    function addSun() {
-      // Create a glowing sun
-      const sunGeometry = new THREE.SphereGeometry(100, 32, 32);
-      const sunMaterial = new THREE.MeshBasicMaterial({ 
-        color: 0xffdd66,
-        transparent: true,
+    function addImpressiveSun() {
+      // Create sun at an appealing angle in the sky
+      const sunAngle = Math.PI * 0.4; // Angle from horizon
+      const sunAzimuth = Math.PI * 0.2; // Direction (0 = east, PI/2 = south)
+      
+      const sunDistance = 8000;
+      const sunX = Math.cos(sunAzimuth) * Math.cos(sunAngle) * sunDistance;
+      const sunY = Math.sin(sunAngle) * sunDistance;
+      const sunZ = Math.sin(sunAzimuth) * Math.cos(sunAngle) * sunDistance;
+      
+      // Create the sun sphere with intense emissive material
+      const sunGeometry = new THREE.SphereGeometry(300, 32, 32);
+      const sunMaterial = new THREE.MeshBasicMaterial({
+        color: 0xFFFFFF,
         fog: false
       });
       
       const sun = new THREE.Mesh(sunGeometry, sunMaterial);
-      
-      // Position the sun high in the sky
-      sun.position.set(5000, 3000, -3000);
+      sun.position.set(sunX, sunY, sunZ);
       scene.add(sun);
       
-      // Add a lens flare or glow effect
-      const sunLight = new THREE.PointLight(0xffffdd, 2, 8000);
-      sunLight.position.copy(sun.position);
+      // Create a strong directional light from the sun
+      const sunLight = new THREE.DirectionalLight(0xFFFFEE, 1);
+      sunLight.position.set(sunX, sunY, sunZ);
+      
+      // Set up shadows
+      sunLight.castShadow = true;
+      sunLight.shadow.mapSize.width = 2048;
+      sunLight.shadow.mapSize.height = 2048;
+      sunLight.shadow.camera.near = 500;
+      sunLight.shadow.camera.far = 10000;
+      sunLight.shadow.camera.left = -3000;
+      sunLight.shadow.camera.right = 3000;
+      sunLight.shadow.camera.top = 3000;
+      sunLight.shadow.camera.bottom = -3000;
+      
       scene.add(sunLight);
+      
+      // Add lens flare effect
+      addSunGlow(new THREE.Vector3(sunX, sunY, sunZ));
+    }
+    
+    function addSunGlow(sunPosition) {
+      // Create several glowing halos around the sun
+      const glowCount = 3;
+      
+      for (let i = 0; i < glowCount; i++) {
+        const size = 350 * (i + 1) * 1.2;
+        const opacity = 0.2 * (1 - i / glowCount);
+        
+        const glowGeometry = new THREE.PlaneGeometry(size, size);
+        
+        // Create a radial gradient for the glow
+        const glowCanvas = document.createElement('canvas');
+        const glowContext = glowCanvas.getContext('2d');
+        glowCanvas.width = 256;
+        glowCanvas.height = 256;
+        
+        const gradient = glowContext.createRadialGradient(
+          128, 128, 0,
+          128, 128, 128
+        );
+        
+        // Create color based on which glow layer
+        let r = 1, g = 1, b = 0.8;
+        if (i === 1) {
+          // Middle glow more yellow
+          r = 1; g = 0.9; b = 0.5;
+        } else if (i === 2) {
+          // Outer glow more orange
+          r = 1; g = 0.7; b = 0.4;
+        }
+        
+        gradient.addColorStop(0, `rgba(${Math.floor(r*255)}, ${Math.floor(g*255)}, ${Math.floor(b*255)}, 1)`);
+        gradient.addColorStop(1, `rgba(${Math.floor(r*255)}, ${Math.floor(g*255)}, ${Math.floor(b*255)}, 0)`);
+        
+        glowContext.fillStyle = gradient;
+        glowContext.fillRect(0, 0, 256, 256);
+        
+        const glowTexture = new THREE.CanvasTexture(glowCanvas);
+        
+        const glowMaterial = new THREE.SpriteMaterial({
+          map: glowTexture,
+          transparent: true,
+          opacity: opacity,
+          blending: THREE.AdditiveBlending,
+          fog: false
+        });
+        
+        const glow = new THREE.Sprite(glowMaterial);
+        glow.position.copy(sunPosition);
+        glow.scale.set(size, size, 1);
+        
+        scene.add(glow);
+      }
     }
   });
