@@ -1,0 +1,67 @@
+<!-- filepath: e:\codeTests\flight\flight\client\index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>3D Multiplayer Game</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      background-color: #1c2e4a;
+      color: white;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    
+    .container {
+      text-align: center;
+    }
+    
+    h1 {
+      font-size: 2.5rem;
+      margin-bottom: 20px;
+      color: #4fc3f7;
+    }
+    
+    p {
+      margin-bottom: 30px;
+      font-size: 1.2rem;
+    }
+    
+    .loader {
+      border: 5px solid #f3f3f3;
+      border-top: 5px solid #3498db;
+      border-radius: 50%;
+      width: 50px;
+      height: 50px;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 20px;
+    }
+    
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  </style>
+  <script>
+    // Redirect to lobby page after a short delay
+    window.onload = function() {
+      setTimeout(function() {
+        window.location.href = '/lobby.html';
+      }, 1500);
+    };
+  </script>
+</head>
+<body>
+  <div class="container">
+    <h1>3D Multiplayer Game</h1>
+    <p>Loading game lobby...</p>
+    <div class="loader"></div>
+  </div>
+</body>
+</html>

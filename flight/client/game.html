@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>3D Flight Game</title>
+  <style>
+    body, html { 
+      margin: 0; 
+      padding: 0; 
+      overflow: hidden;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    canvas { 
+      display: block; 
+      width: 100%;
+      height: 100%;
+    }
+    #ui { 
+      position: absolute; 
+      top: 10px; 
+      left: 10px; 
+      color: white; 
+      background-color: rgba(0,0,0,0.5); 
+      padding: 10px; 
+      border-radius: 5px;
+      z-index: 10;
+    }
+    #player-info {
+      margin-bottom: 10px;
+      font-weight: bold;
+    }
+    #back-to-lobby {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background-color: rgba(0,0,0,0.5);
+      color: white;
+      border: none;
+      padding: 8px 15px;
+      border-radius: 5px;
+      cursor: pointer;
+      z-index: 10;
+    }
+    #back-to-lobby:hover {
+      background-color: rgba(0,0,0,0.7);
+    }
+    #controls {
+      position: absolute;
+      bottom: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      background-color: rgba(0,0,0,0.5);
+      color: white;
+      padding: 10px;
+      border-radius: 5px;
+      text-align: center;
+      z-index: 10;
+    }
+    .key {
+      display: inline-block;
+      background-color: #333;
+      border: 1px solid #555;
+      padding: 2px 8px;
+      margin: 0 2px;
+      border-radius: 3px;
+    }
+  </style>
+</head>
+<body>
+  <div id="ui">
+    <div id="player-info">Player: <span id="player-name-display">Unknown</span></div>
+    <div id="room-info">Room: <span id="room-id-display">Unknown</span></div>
+    <div id="player-count">Players: 0</div>
+    <div id="connection-status">Status: Disconnected</div>
+    <div id="altitude">Altitude: 0m</div>
+    <div id="speed">Speed: 0 km/h</div>
+  </div>
+  
+  <button id="back-to-lobby">Back to Lobby</button>
+  
+  <div id="controls">
+    <div>W/S - Pitch | A/D - Roll | Q/E - Yaw | Space - Shoot</div>
+    <div>↑/↓ or <span class="key">W</span>/<span class="key">S</span> - Speed</div>
+  </div>
+
+  <!-- Three.js library -->
+  <script src="https://cdn.jsdelivr.net/npm/three@0.157.0/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.157.0/examples/js/controls/OrbitControls.js"></script>
+  
+  <!-- Socket.io client library from CDN -->
+  <script src="https://cdn.socket.io/4.6.0/socket.io.min.js"></script>
+  
+  <!-- Network manager -->
+  <script src="js/network.js"></script>
+  
+  <!-- Aircraft model and physics -->
+  <script src="js/aircraft.js"></script>
+  
+  <!-- Bullet script -->
+  <script src="js/bullet.js"></script>
+  
+  <!-- Game script -->
+  <script src="js/game.js"></script>
+</body>
+</html>
