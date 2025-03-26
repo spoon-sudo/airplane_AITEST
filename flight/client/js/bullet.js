@@ -103,6 +103,7 @@ class Bullet {
     return false;
   }
   
+  
   remove() {
     if (this.mesh) {
       this.scene.remove(this.mesh);
